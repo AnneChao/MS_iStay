@@ -1,4 +1,4 @@
-MS_iStay (R code and data for graphics in 2025 Ecological Monographs paper by Chao et al.)
+MS_iStay (R code and data for graphics in 2025 manuscripts by Chao et al.)
 
 R code and data are provided for plotting all figures in the paper "A continuum of information-based temporal stability measures and their decomposition across hierarchical levels". Before using the R code, you must download the package "iStay" from Anne Chao's Github. 
 
