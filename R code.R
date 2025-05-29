@@ -198,3 +198,4 @@ fig2_or_4(output_fig_4b, metric_name = "Alpha")
 output_fig_4c <- LMM_2_to_4(output4, structure = structure4, metric_name = "Synchrony")
 
 fig2_or_4(output_fig_4c, metric_name = "Synchrony")
+
