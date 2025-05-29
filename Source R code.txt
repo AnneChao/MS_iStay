@@ -366,7 +366,7 @@ slope_3 <- function(metric_name) {
     result$slope_text |>
       dplyr::filter(block == "Total") |>
       dplyr::mutate(
-        starting_year = valid_start_years[i],
+        starting_year = as.numeric(year_windows[[i]][1]),
         slope_num = readr::parse_number(slope_text)
       )
     
