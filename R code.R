@@ -3,22 +3,16 @@
 # Install and upload libraries ----
 
 library(tidyverse)
-library(dplyr)
-library(purrr)
-library(stringr)
-library(readr)
-
-
+library(lmerTest)
 
 # ========================================================================================================== #
 # 
 # This code includes four parts:
 # 
 # (1) Figure 1. Gamma, alpha and synchrony profiles for q between 0 and 2 within each plot. 
-# (2) Figure 2. The relationships between biodiversity and gamma stability, alpha stability, and synchrony for each fixed value of q were modeled using linear mixed-effects models with random slopes and random intercepts for each block. (species level)
-# (3) Figure 3. (Left panels) The average (a) gamma (plot-level) stability and (b) alpha (species-level) stability of order q = 0.5, 1 and 2 across all plots with the same number of species. The average species synchrony values (c) were obtained across plots with monoculture plots being excluded. 
-#               (Right panels) The effects of species richness on (a) gamma stability, (b) alpha stability, and (c) species synchrony, represented by the slopes of each biodiversity–stability or biodiversity–synchrony relationship across 12 consecutive 10-year windows.
-# (4) Figure 4. The relationships between biodiversity and gamma stability, alpha stability, and synchrony for each fixed value of q were modeled using linear mixed-effects models with random slopes and random intercepts for each block. (plot level)
+# (2) Figure 2. Biodiversity–stability and biodiversity–synchrony relationships based on 76 plots.
+# (3) Figure 3. Temporal effects of species richness on stability and synchrony based on 12 consecutive overlapping 10-year moving window.
+# (4) Figure 4. Biodiversity–stability and biodiversity–synchrony relationships based on 20 sets
 #
 # See "Brief guide" for details. 
 # 
@@ -65,7 +59,7 @@ fig_1c(output_fig_1)
 
 
 # ========================================================================================================== #
-# Figure 2. The relationships between biodiversity and gamma stability, alpha stability, and synchrony for each fixed value of q were modeled using linear mixed-effects models with random slopes and random intercepts for each block. (species level)
+# Figure 2. Biodiversity–stability and biodiversity–synchrony relationships based on 76 plots.
 
 split_names2 <- str_split(names(Jena_species_biomass_data), "_", simplify = TRUE)
 
@@ -98,7 +92,7 @@ fig2_or_4(output_fig_2c, metric_name = "Synchrony")
 
 
 # ========================================================================================================== #
-# Figure 3. (Left panels) The average (a) gamma (plot-level) stability and (b) alpha (species-level) stability of order q = 0.5, 1 and 2 across all plots with the same number of species. The average species synchrony values (c) were obtained across plots with monoculture plots being excluded.
+# Figure 3. Temporal effects of species richness on stability and synchrony based on 12 consecutive overlapping 10-year moving window.
 
 ### Left
 
@@ -176,7 +170,7 @@ output_fig_3c_right <- slope_3(metric_name = "Synchrony")
 fig_3_right(output_fig_3c_right)
 
 # ========================================================================================================== #
-# Figure 4. The relationships between biodiversity and gamma stability, alpha stability, and synchrony for each fixed value of q were modeled using linear mixed-effects models with random slopes and random intercepts for each block. (plot level)
+# Figure 4. Biodiversity–stability and biodiversity–synchrony relationships based on 20 sets
 
 split_names4 <- str_split(names(Jena_plot_biomass_data), "_", simplify = TRUE)
 
