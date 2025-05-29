@@ -1,0 +1,404 @@
+#' @Function fig_1a is used to plot Figure 1 (a).
+#' @param output is an object computed from function 'Stay_Multiple' in the package 'iStay'.
+#' 
+fig_1a <- function(output){
+  output |> 
+  ggplot() +
+  geom_line(aes(Order_q, Gamma, color = Site), linewidth = 1.2) +
+  labs(x = "Order.q", y = "Gamma stability", color = "Plot") +
+  theme_bw() +
+  theme(legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        axis.text = element_text(size = 16),
+        text = element_text(size = 14), 
+        strip.text.x = element_text(size = 14),
+        strip.text.y = element_text(size = 14),
+        axis.title.x = element_text(hjust = 0.5, size = 14),
+        axis.title.y = element_text(hjust = 0.5, size = 14))
+  
+}
+
+#' @Function fig_1b is used to plot Figure 1 (b).
+#' @param output is an object computed from function 'Stay_Multiple' in the package 'iStay'.
+#' @param output2 are objects computed from function 'Stay_Single' in the package 'iStay'.
+#' 
+fig_1b <- function(output, output2){
+  output |> 
+  ggplot() +
+  geom_line(aes(Order_q, Alpha, color = Site), linewidth = 1.2) +
+  geom_line(data = output2, aes(Order_q, Stability, color = Site, group = `Plot/Community`), linetype = "dashed", linewidth = 0.8, alpha = 0.7) +
+  labs(x = "Order.q", y = "Alpha stability", color = "Plot") +
+  theme_bw() +
+  theme(legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        axis.text = element_text(size = 16),
+        text = element_text(size = 14), 
+        strip.text.x = element_text(size = 14),
+        strip.text.y = element_text(size = 14),
+        axis.title.x = element_text(hjust = 0.5, size = 14),
+        axis.title.y = element_text(hjust = 0.5, size = 14))
+}
+
+#' @Function fig_1c is used to plot Figure 1 (c).
+#' @param output is an object computed from function 'Stay_Multiple' in the package 'iStay'.
+
+#' 
+fig_1c <- function(output){
+  output |> 
+  ggplot() +
+  geom_line(aes(Order_q, Synchrony, color = Site), linewidth = 1.2) +
+  labs(x = "Order.q", y = "Synchrony among species", color = "Plot") +
+  theme_bw() +
+  theme(legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        axis.text = element_text(size = 16),
+        text = element_text(size = 14), 
+        strip.text.x = element_text(size = 14),
+        strip.text.y = element_text(size = 14),
+        axis.title.x = element_text(hjust = 0.5, size = 14),
+        axis.title.y = element_text(hjust = 0.5, size = 14))
+  
+}
+
+
+#' @Function LMM_2_to_4 is used to calculate linear mixed model results for Figure 2 to Figure4.
+#' @param output is an object computed from function 'Stay_Multiple' in the package 'iStay'.
+#' @param structure A data.frame containing block-level structural information, 
+#' typically including columns such as `block` and `log2_sowndiv`. This is used to fit 
+#' linear mixed-effects models and to associate each diversity level with its corresponding block.
+#' @param metric_name A character string specifying the ecological stability metric 
+#' to be analyzed. Acceptable values include column names from the `output` object, 
+#' such as `"Gamma"`, `"Alpha"`, or `"Synchrony"`.
+#'
+
+
+LMM_2_to_4 <- function(output, structure, metric_name) {
+  # Build plotdata using the selected metric column from precomputed output
+  plotdata <- data.frame(
+    block = rep(structure$block, 3),
+    log2_sowndiv = rep(structure$log2_sowndiv, 3),
+    value = c(output[[metric_name]]),
+    version = factor(rep(c("q = 0.5", "q = 1", "q = 2"), each = nrow(structure)))
+  )
+  
+  # Initialize containers for results
+  combined_total_fit <- data.frame()
+  combined_part_fit <- data.frame()
+  combined_slope_text <- data.frame()
+  
+  # Loop over each q version
+  for (v in levels(plotdata$version)) {
+    subdata <- dplyr::filter(plotdata, version == v)
+    
+    # Fit linear mixed-effects model
+    model <- lmerTest::lmer(value ~ 1 + log2_sowndiv + (1 + log2_sowndiv | block), data = subdata)
+    summary_model <- summary(model)
+    
+    # Add predictions and significance markers
+    subdata$predicted <- predict(model, newdata = subdata, re.form = NA)
+    subdata$significance <- ifelse(summary_model$coefficients[2, 5] < 0.05, "significant", "non-significant")
+    
+    # Get slopes and intercepts per block
+    slopes <- coef(model)$block
+    slope_intercept <- data.frame(
+      block = rownames(slopes),
+      intercept = slopes[, 1],
+      slope = slopes[, 2],
+      x_min = tapply(subdata$log2_sowndiv, subdata$block, min),
+      x_max = tapply(subdata$log2_sowndiv, subdata$block, max),
+      version = v
+    )
+    
+    # Create slope text for plot annotations
+    slope_text_metric <- data.frame(
+      block = c(rownames(slopes), "Total"),
+      slope_text = c(
+        paste0("slope = ", sprintf("%.4f", slopes[, 2])),
+        paste0("slope = ", sprintf("%.4f", summary_model$coefficients[2, 1]))
+      ),
+      version = v
+    )
+    
+    # Combine results
+    combined_total_fit <- rbind(combined_total_fit, subdata)
+    combined_part_fit <- rbind(combined_part_fit, slope_intercept)
+    combined_slope_text <- rbind(combined_slope_text, slope_text_metric)
+  }
+  
+  # Rename "value" column to the actual metric name
+  names(combined_total_fit)[names(combined_total_fit) == "value"] <- metric_name
+  names(plotdata)[names(plotdata) == "value"] <- metric_name
+  
+  # Return results
+  return(list(
+    total_fit = combined_total_fit,
+    part_fit = combined_part_fit,
+    slope_text = combined_slope_text,
+    plotdata = plotdata
+  ))
+}
+
+
+#' @Function fig_2_or_4 is used to plot Figure 2 or Figure4.
+#' @param output is an object computed from function LMM_2_or_4.
+#' @param metric_name A character string specifying the ecological stability metric 
+#' to be analyzed. Acceptable values include column names from the `output` object, 
+#' such as `"Gamma"`, `"Alpha"`, or `"Synchrony"`.
+#'
+
+fig2_or_4 <- function(output, metric_name) {
+  color_palette <- c("#EA0000", "#4f772d", "#0066CC", "#fb8500")
+
+  total_fit <- output$total_fit
+  part_fit <- output$part_fit
+  slope_text <- output$slope_text
+
+  total_fit$significance <- factor(total_fit$significance, levels = c("significant", "non-significant"))
+  if (!any(total_fit$significance == "non-significant")) {
+    dummy <- total_fit[1, ]
+    dummy$log2_sowndiv <- NA
+    dummy$predicted <- NA
+    metric_col <- setdiff(names(total_fit), c("log2_sowndiv", "predicted", "significance", "sign", "block", "version"))
+    dummy[[metric_name]] <- NA
+    dummy$significance <- "non-significant"
+    total_fit <- rbind(total_fit, dummy)
+  }
+
+  p <- ggplot()
+
+  if (identical(output, output_fig_2a)) {
+    p <- p +
+      geom_point(data = total_fit, aes(x = log2_sowndiv, y = Gamma, color = block), size = 3, alpha = 0.5) +
+      geom_text(data = slope_text |> filter(block == "Total"),
+                aes(x = 1, y = 0.275, label = slope_text),
+                hjust = rep(-1.1, 3), vjust = rep(-2, 3), size = 3.5) +
+      geom_text(data = slope_text |> filter(block != "Total"),
+                aes(x = 1, y = 0.275, label = slope_text, color = block,
+                    hjust = rep(-c(0,1.1,0,1.1), 3),
+                    vjust = rep(c(0, 0, 2, 2), 3)),
+                size=3.5, key_glyph = draw_key_path) +
+      labs(y = "Community stability")
+    
+  } else if (identical(output, output_fig_2b)) {
+    p <- p +
+      geom_point(data = total_fit, aes(x = log2_sowndiv, y = Alpha, color = block), size = 3, alpha = 0.5) +
+      geom_text(data = slope_text |> filter(block == "Total"),
+                aes(x = 0.6, y = 0.22, label = slope_text),
+                hjust = rep(-1.1, 3), vjust = c(rep(-2, 2), -21), size = 3.5) +
+      geom_text(data = slope_text |> filter(block != "Total"),
+                aes(x = 0.6, y = 0.22, label = slope_text, color = block,
+                    hjust = rep(-c(0,1.1,0,1.1), 3),
+                    vjust = c(rep(c(0, 0, 2, 2), 2), c(-25, -25, -23, -23))),
+                size=3.5, key_glyph = draw_key_path) +
+      labs(y = "Population stability")
+    
+  } else if (identical(output, output_fig_2c)) {
+    p <- p +
+      geom_point(data = total_fit, aes(x = log2_sowndiv, y = Synchrony, color = block), size = 3, alpha = 0.5) +
+      geom_text(data = slope_text |> filter(block == "Total"),
+                aes(x = 1.5, y = 0.40, label = slope_text),
+                hjust = rep(-1.1, 3), vjust = c(2, rep(-16, 2)), size = 3.5) +
+      geom_text(data = slope_text |> filter(block != "Total"),
+                aes(x = 1.5, y = 0.40, label = slope_text, color = block,
+                    hjust = rep(-c(0, 1.1, 0, 1.1), 3),
+                    vjust = c(4, 4, 6, 6, rep(c(-20, -20, -18, -18), 2))),
+                size=3.5, key_glyph = draw_key_path) +
+      labs(y = "Population synchrony")
+    
+  } else if (identical(output, output_fig_4a)) {
+    p <- p +
+      geom_point(data = total_fit, aes(x = log2_sowndiv, y = Gamma, color = block), size = 3, alpha = 0.5) +
+      geom_text(data = slope_text |> filter(block == "Total"),
+                aes(x = 1, y = 0.48, label = slope_text),
+                hjust = rep(-1.1, 3), vjust = rep(-2, 3), size = 3.5) +
+      geom_text(data = slope_text |> filter(block != "Total"),
+                aes(x = 1, y = 0.48, label = slope_text, color = block,
+                    hjust = rep(-c(0,1.1,0,1.1), 3),
+                    vjust = rep(c(0, 0, 2, 2), 3)),
+                size=3.5, key_glyph = draw_key_path) +
+      labs(y = "Gamma stability")
+    
+  } else if (identical(output, output_fig_4b)) {
+    p <- p +
+      geom_point(data = total_fit, aes(x = log2_sowndiv, y = Alpha, color = block), size = 3, alpha = 0.5) +
+      geom_text(data = slope_text |> filter(block == "Total"),
+                aes(x = 1, y = 0.42, label = slope_text),
+                hjust = rep(-1.1, 3), vjust = rep(-2, 3), size = 3.5) +
+      geom_text(data = slope_text |> filter(block != "Total"),
+                aes(x = 1, y = 0.42, label = slope_text, color = block,
+                    hjust = rep(-c(0,1.1,0,1.1), 3),
+                    vjust = rep(c(0, 0, 2, 2), 3)),
+                size=3.5, key_glyph = draw_key_path) +
+      labs(y = "Alpha stability")
+    
+  } else if (identical(output, output_fig_4c)) {
+    p <- p +
+      geom_point(data = total_fit, aes(x = log2_sowndiv, y = Synchrony, color = block), size = 3, alpha = 0.5) +
+      geom_text(data = slope_text |> filter(block == "Total"),
+                aes(x = 1, y = 0.8, label = slope_text),
+                hjust = rep(-1.1, 3), vjust = rep(-2, 3), size = 3.5) +
+      geom_text(data = slope_text |> filter(block != "Total"),
+                aes(x = 1, y = 0.8, label = slope_text, color = block,
+                    hjust = rep(-c(0, 1.1, 0, 1.1), 3),
+                    vjust = rep(c(0, 0, 2, 2), 3)),
+                size=3.5, key_glyph = draw_key_path) +
+      labs(y = "Plot spatial synchrony")
+  }
+
+  p <- p +
+    geom_segment(data = part_fit,
+                 aes(x = x_min, xend = x_max,
+                     y = intercept + slope * x_min,
+                     yend = intercept + slope * x_max,
+                     color = block)) +
+    geom_line(data = total_fit,
+              aes(x = log2_sowndiv, y = predicted, linetype = significance), linewidth = 1.5) +
+    scale_color_manual(values = color_palette) +
+    scale_linetype_manual(values = c("significant" = "solid", "non-significant" = "dashed"),
+                          labels = c("significant" = "Significant", "non-significant" = "Non-significant"),
+                          drop = FALSE) +
+    facet_grid(~ version) +
+    scale_x_continuous(breaks = c(0, 1, 2, 3, 4), labels = c(1, 2, 4, 8, 16)) +
+    labs(linetype = "", x = "Number of species (log2 scale)") +
+    guides(linetype = guide_legend(keywidth = 3.1)) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.title = element_text(size = 13),
+          legend.box.margin = unit(c(0.5, 0.5, 0.5, 0.5), "cm"),
+          legend.text = element_text(size = 12),
+          legend.title = element_blank(),
+          axis.text = element_text(size = 16),
+          text = element_text(size = 14),
+          strip.text.x = element_text(size = 14),
+          strip.text.y = element_text(size = 14),
+          axis.title.x = element_text(hjust = 0.5, size = 14),
+          axis.title.y = element_text(hjust = 0.5, size = 14))
+
+  return(p)
+}
+
+
+#' @Function fig_3_left is used to plot left panel of Figure 3.
+#' @param summart_df is a summary result for the output of function 'Stay_Multiple' in the package 'iStay'.
+#'
+
+fig_3_left <- function(summary_df) {
+  # Define shared settings
+  color_palette <- c("#F8766D", "#A3A500", "#00BF7D", "#343a40", "#E76BF3")
+  shape_palette <- c(20, 15, 18, 17, 19)
+  x_breaks <- c(2003, 2005, 2007, 2009, 2011, 2013, 2015)
+  base_theme <- theme_bw() +
+    theme(
+      legend.position = "bottom",
+      axis.title = element_text(size = 13),
+      legend.box.margin = unit(c(0.5, 0.5, 0.5, 0.5), "cm"),
+      legend.text = element_text(size = 12),
+      text = element_text(size = 14),
+      axis.text = element_text(size = 14),
+      strip.text.x = element_text(size = 14),
+      strip.text.y = element_text(size = 14),
+      axis.title.x = element_text(hjust = 0.5, size = 14),
+      axis.title.y = element_text(hjust = 0.5, size = 14),
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+
+  # Plot for Gamma
+  p1 <- ggplot(summary_df) +
+    geom_point(aes(x = Start_year, y = mean_gamma, color = factor(log2_sowndiv), shape = factor(log2_sowndiv)), size = 3) +
+    geom_line(aes(x = Start_year, y = mean_gamma, color = factor(log2_sowndiv)), linewidth = 1) +
+    facet_wrap(~ Order_q, nrow = 1) +
+    scale_color_manual(values = color_palette) +
+    scale_shape_manual(values = shape_palette) +
+    scale_x_continuous(breaks = x_breaks) +
+    labs(y = "Community stability", x = "Starting year of sliding 10-year windows", color = "Number of species", shape = "Number of species") +
+    base_theme
+
+  # Plot for Alpha
+  p2 <- ggplot(summary_df) +
+    geom_point(aes(x = Start_year, y = mean_alpha, color = factor(log2_sowndiv), shape = factor(log2_sowndiv)), size = 3) +
+    geom_line(aes(x = Start_year, y = mean_alpha, color = factor(log2_sowndiv)), linewidth = 1) +
+    facet_wrap(~ Order_q, nrow = 1) +
+    scale_color_manual(values = color_palette) +
+    scale_shape_manual(values = shape_palette) +
+    scale_x_continuous(breaks = x_breaks) +
+    labs(y = "Population stability", x = "Starting year of sliding 10-year windows", color = "Number of species", shape = "Number of species") +
+    base_theme
+
+  # Plot for Synchrony (excluding log2_sowndiv == 1)
+  p3 <- summary_df |> 
+    filter(log2_sowndiv != 1) |> 
+    ggplot() +
+    geom_point(aes(x = Start_year, y = mean_syn, color = factor(log2_sowndiv), shape = factor(log2_sowndiv)), size = 3) +
+    geom_line(aes(x = Start_year, y = mean_syn, color = factor(log2_sowndiv)), linewidth = 1) +
+    facet_wrap(~ Order_q, nrow = 1) +
+    scale_color_manual(values = color_palette[-1]) +
+    scale_shape_manual(values = shape_palette[-1]) +
+    scale_x_continuous(breaks = x_breaks) +
+    labs(y = "Population synchrony", x = "Starting year of sliding 10-year windows", color = "Number of species", shape = "Number of species") +
+    base_theme
+
+  return(list(Gamma_plot = p1, Alpha_plot = p2, Synchrony_plot = p3))
+}
+
+
+#' @Function slope_3 is used to calculate slope over window for Figure 3.
+#' @param metric_name A character string specifying the ecological stability metric 
+#' to be analyzed. Acceptable values include column names from the `output` object, 
+#' such as `"Gamma"`, `"Alpha"`, or `"Synchrony"`.
+#'
+
+slope_3 <- function(metric_name) {
+  lapply(seq_along(year_windows), function(i) {
+    
+    # Extract 10-year data window
+    data_10yr <- lapply(Jena_species_biomass_data, \(df) df[, year_windows[[i]], drop = FALSE])
+    names(data_10yr) <- names(Jena_species_biomass_data)
+    
+    # Compute metric output and fit LMM
+    output <- Stay_Multiple(data_10yr, order.q = c(0.5, 1, 2))
+    if(metric_name == "Synchrony"){ 
+      output <- output |> filter(Synchrony != 1)
+      structure3 <- structure3 |> filter(log2_sowndiv != 0)
+    }
+    result <- LMM_2_to_4(output, structure3, metric_name = metric_name)
+    
+    # Extract slope information for Total block
+    result$slope_text |>
+      dplyr::filter(block == "Total") |>
+      dplyr::mutate(
+        starting_year = valid_start_years[i],
+        slope_num = readr::parse_number(slope_text)
+      )
+    
+  }) |> dplyr::bind_rows()
+}
+
+#' @Function fig_3_right is used to plot right panel of Figure 3.
+#' @param output is an object computed from function slpoe_3.
+#'
+fig_3_right <- function(output) {
+  y_label <- "Effect of species richness"
+  default_colors <- c("#386641", "#6a994e", "#a7c957")
+  
+  ggplot(output) +
+    geom_line(aes(x = starting_year, y = slope_num, color = version, linetype = version), linewidth = 1) +
+    geom_point(aes(x = starting_year, y = slope_num, color = version), size = 3) +
+    scale_x_continuous(breaks = c(2003, 2005, 2007, 2009, 2011, 2013, 2015)) +
+    scale_color_manual(values = default_colors) +
+    labs(y = y_label, x = "Starting year of sliding 10-year windows") +
+    guides(linetype = guide_legend(keywidth = 3.1)) +
+    theme_bw() +
+    theme(
+      legend.position = "bottom", 
+      axis.title = element_text(size = 13),
+      legend.box.margin = unit(c(0.5, 0.5, 0.5, 0.5), "cm"),
+      legend.text = element_text(size = 12),
+      legend.title = element_blank(),
+      text = element_text(size = 14), 
+      axis.text = element_text(size = 16),
+      strip.text.x = element_text(size = 14),
+      strip.text.y = element_text(size = 14),
+      axis.title.x = element_text(hjust = 0.5, size = 14),
+      axis.title.y = element_text(hjust = 0.5, size = 14)
+    )
+}
